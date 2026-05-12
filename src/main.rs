@@ -96,6 +96,12 @@ struct RoadMatch<'a> {
     distance: f64,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct RoadCandidate<'a> {
+    segment: &'a RoadSegment,
+    distance_squared: f64,
+}
+
 fn main() {
     if let Err(error) = run() {
         eprintln!("error: {error}");
@@ -110,13 +116,8 @@ fn run() -> AppResult<()> {
     let road_segments = load_road_segments()?;
 
     let zone_matches = find_zones(zones, config.point);
-    let road_match = find_nearest_road(road_segments, config.point, config.street_radius);
-    let intersection_match = find_intersection_road(
-        road_segments,
-        road_match.as_ref(),
-        config.point,
-        config.street_radius,
-    );
+    let (road_match, intersection_match) =
+        find_road_matches(road_segments, config.point, config.street_radius);
 
     match config.output {
         OutputSelection::AllJson => {
@@ -494,58 +495,104 @@ fn bounds_volume(bounds: Bounds) -> f64 {
         * (bounds.max.z - bounds.min.z).abs().max(1.0)
 }
 
-fn find_nearest_road(
+fn find_road_matches(
     segments: &[RoadSegment],
     point: Vec3,
     street_radius: Option<f64>,
-) -> Option<RoadMatch<'_>> {
-    segments
-        .iter()
-        .filter_map(|segment| {
-            let distance = distance_to_segment(point, segment.start, segment.end);
+) -> (Option<RoadMatch<'_>>, Option<RoadMatch<'_>>) {
+    let mut nearest = None;
+    let mut nearest_other_street = None;
 
-            if street_radius.is_some_and(|radius| distance > radius) {
-                return None;
+    for segment in segments {
+        let distance_squared = distance_to_segment_squared(point, segment.start, segment.end);
+
+        if street_radius.is_some_and(|radius| distance_squared.sqrt() > radius) {
+            continue;
+        }
+
+        let candidate = RoadCandidate {
+            segment,
+            distance_squared,
+        };
+
+        match nearest {
+            None => nearest = Some(candidate),
+            Some(current_nearest) if is_nearer(candidate, current_nearest) => {
+                nearest_other_street =
+                    nearest_for_different_street(candidate, current_nearest, nearest_other_street);
+                nearest = Some(candidate);
             }
+            Some(current_nearest) if segment.street_name != current_nearest.segment.street_name => {
+                nearest_other_street = nearer_candidate(nearest_other_street, candidate);
+            }
+            Some(_) => {}
+        }
+    }
 
-            Some(RoadMatch { segment, distance })
-        })
-        .min_by(|a, b| {
-            a.distance
-                .partial_cmp(&b.distance)
-                .unwrap_or(Ordering::Equal)
-        })
+    let Some(nearest) = nearest else {
+        return (None, None);
+    };
+
+    let primary = nearest.to_match();
+    let max_intersection_distance = street_radius.unwrap_or(35.0).max(primary.distance);
+    let intersection = nearest_other_street
+        .filter(|candidate| candidate.distance() <= max_intersection_distance)
+        .map(RoadCandidate::to_match);
+
+    (Some(primary), intersection)
 }
 
-fn find_intersection_road<'a>(
-    segments: &'a [RoadSegment],
-    road_match: Option<&RoadMatch<'a>>,
-    point: Vec3,
-    street_radius: Option<f64>,
-) -> Option<RoadMatch<'a>> {
-    let primary = road_match?;
-    let max_distance = street_radius.unwrap_or(35.0).max(primary.distance);
+fn nearest_for_different_street<'a>(
+    new_primary: RoadCandidate<'a>,
+    old_primary: RoadCandidate<'a>,
+    old_other_street: Option<RoadCandidate<'a>>,
+) -> Option<RoadCandidate<'a>> {
+    let mut nearest = None;
 
-    segments
-        .iter()
-        .filter(|segment| segment.street_name != primary.segment.street_name)
-        .filter_map(|segment| {
-            let distance = distance_to_segment(point, segment.start, segment.end);
+    if old_primary.segment.street_name != new_primary.segment.street_name {
+        nearest = nearer_candidate(nearest, old_primary);
+    }
 
-            if distance > max_distance {
-                return None;
-            }
+    if let Some(old_other_street) = old_other_street {
+        if old_other_street.segment.street_name != new_primary.segment.street_name {
+            nearest = nearer_candidate(nearest, old_other_street);
+        }
+    }
 
-            Some(RoadMatch { segment, distance })
-        })
-        .min_by(|a, b| {
-            a.distance
-                .partial_cmp(&b.distance)
-                .unwrap_or(Ordering::Equal)
-        })
+    nearest
 }
 
-fn distance_to_segment(point: Vec3, start: Vec3, end: Vec3) -> f64 {
+fn nearer_candidate<'a>(
+    current: Option<RoadCandidate<'a>>,
+    candidate: RoadCandidate<'a>,
+) -> Option<RoadCandidate<'a>> {
+    match current {
+        Some(current) if !is_nearer(candidate, current) => Some(current),
+        _ => Some(candidate),
+    }
+}
+
+fn is_nearer(candidate: RoadCandidate<'_>, current: RoadCandidate<'_>) -> bool {
+    candidate
+        .distance_squared
+        .partial_cmp(&current.distance_squared)
+        == Some(Ordering::Less)
+}
+
+impl<'a> RoadCandidate<'a> {
+    fn distance(self) -> f64 {
+        self.distance_squared.sqrt()
+    }
+
+    fn to_match(self) -> RoadMatch<'a> {
+        RoadMatch {
+            segment: self.segment,
+            distance: self.distance(),
+        }
+    }
+}
+
+fn distance_to_segment_squared(point: Vec3, start: Vec3, end: Vec3) -> f64 {
     let ab = Vec3 {
         x: end.x - start.x,
         y: end.y - start.y,
@@ -559,7 +606,7 @@ fn distance_to_segment(point: Vec3, start: Vec3, end: Vec3) -> f64 {
     let ab_len_sq = dot(ab, ab);
 
     if ab_len_sq == 0.0 {
-        return distance(point, start);
+        return distance_squared(point, start);
     }
 
     let t = (dot(ap, ab) / ab_len_sq).clamp(0.0, 1.0);
@@ -568,15 +615,15 @@ fn distance_to_segment(point: Vec3, start: Vec3, end: Vec3) -> f64 {
         y: start.y + ab.y * t,
         z: start.z + ab.z * t,
     };
-    distance(point, closest)
+    distance_squared(point, closest)
 }
 
 fn dot(a: Vec3, b: Vec3) -> f64 {
     a.x * b.x + a.y * b.y + a.z * b.z
 }
 
-fn distance(a: Vec3, b: Vec3) -> f64 {
-    ((a.x - b.x).powi(2) + (a.y - b.y).powi(2) + (a.z - b.z).powi(2)).sqrt()
+fn distance_squared(a: Vec3, b: Vec3) -> f64 {
+    (a.x - b.x).powi(2) + (a.y - b.y).powi(2) + (a.z - b.z).powi(2)
 }
 
 fn print_json(
