@@ -112,12 +112,22 @@ fn main() {
 
 fn run() -> AppResult<()> {
     let config = parse_args(env::args().skip(1).collect())?;
-    let zones = load_zones()?;
-    let road_segments = load_road_segments()?;
 
-    let zone_matches = find_zones(zones, config.point);
-    let (road_match, intersection_match) =
-        find_road_matches(road_segments, config.point, config.street_radius);
+    let zone_matches = if config.output.needs_zones() {
+        find_zones(load_zones()?, config.point)
+    } else {
+        Vec::new()
+    };
+    let (road_match, intersection_match) = if config.output.needs_intersection() {
+        find_road_matches(load_road_segments()?, config.point, config.street_radius)
+    } else if config.output.needs_roads() {
+        (
+            find_nearest_road(load_road_segments()?, config.point, config.street_radius),
+            None,
+        )
+    } else {
+        (None, None)
+    };
 
     match config.output {
         OutputSelection::AllJson => {
@@ -138,6 +148,33 @@ fn run() -> AppResult<()> {
     }
 
     Ok(())
+}
+
+impl OutputSelection {
+    fn needs_zones(&self) -> bool {
+        match self {
+            OutputSelection::AllJson => true,
+            OutputSelection::Fields(fields) => fields
+                .iter()
+                .any(|field| matches!(field, OutputField::ZoneCode | OutputField::ZoneName)),
+        }
+    }
+
+    fn needs_roads(&self) -> bool {
+        match self {
+            OutputSelection::AllJson => true,
+            OutputSelection::Fields(fields) => fields
+                .iter()
+                .any(|field| matches!(field, OutputField::Road | OutputField::Intersection)),
+        }
+    }
+
+    fn needs_intersection(&self) -> bool {
+        match self {
+            OutputSelection::AllJson => true,
+            OutputSelection::Fields(fields) => fields.contains(&OutputField::Intersection),
+        }
+    }
 }
 
 fn parse_args(args: Vec<String>) -> AppResult<Config> {
@@ -502,11 +539,12 @@ fn find_road_matches(
 ) -> (Option<RoadMatch<'_>>, Option<RoadMatch<'_>>) {
     let mut nearest = None;
     let mut nearest_other_street = None;
+    let street_radius_squared = street_radius.map(|radius| radius * radius);
 
     for segment in segments {
         let distance_squared = distance_to_segment_squared(point, segment.start, segment.end);
 
-        if street_radius.is_some_and(|radius| distance_squared.sqrt() > radius) {
+        if street_radius_squared.is_some_and(|radius_squared| distance_squared > radius_squared) {
             continue;
         }
 
@@ -540,6 +578,33 @@ fn find_road_matches(
         .map(RoadCandidate::to_match);
 
     (Some(primary), intersection)
+}
+
+fn find_nearest_road(
+    segments: &[RoadSegment],
+    point: Vec3,
+    street_radius: Option<f64>,
+) -> Option<RoadMatch<'_>> {
+    let mut nearest = None;
+    let street_radius_squared = street_radius.map(|radius| radius * radius);
+
+    for segment in segments {
+        let distance_squared = distance_to_segment_squared(point, segment.start, segment.end);
+
+        if street_radius_squared.is_some_and(|radius_squared| distance_squared > radius_squared) {
+            continue;
+        }
+
+        nearest = nearer_candidate(
+            nearest,
+            RoadCandidate {
+                segment,
+                distance_squared,
+            },
+        );
+    }
+
+    nearest.map(RoadCandidate::to_match)
 }
 
 fn nearest_for_different_street<'a>(
