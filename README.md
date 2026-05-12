@@ -13,6 +13,28 @@ Given 3D GTA V map coordinates, it can return:
 
 Without `--output`, it returns the full result as JSON.
 
+## Why This Exists
+
+GTA V and FiveM already have natives that can resolve this kind of information while the game is running, such as zone and street-name lookups.
+
+The problem is that those natives are only available inside the game/client runtime. They are not available when you are working with raw coordinates from:
+
+- Server logs.
+- Database rows.
+- Admin reports.
+- Discord alerts.
+- Teleport/debug tools.
+- Offline scripts.
+- Automation pipelines.
+
+This tool solves that gap by doing the lookup offline:
+
+```text
+x y z -> zone code / zone name / road / nearby intersection
+```
+
+That makes it useful when you need readable GTA V locations without opening the game or joining a server.
+
 ## Embedded Data
 
 The GTAV data is embedded into the binary at build time:
