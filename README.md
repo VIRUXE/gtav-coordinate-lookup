@@ -229,6 +229,47 @@ In this example, the road is only returned if it is within `30` meters of the co
 
 This is useful when you want confidence that the returned road really belongs to the coordinate.
 
+Example where the radius matters:
+
+```bash
+gtav-coordinate-lookup --output road,intersection 0 0 1000
+```
+
+```json
+{
+  "road": "Las Lagunas Blvd",
+  "intersection": null
+}
+```
+
+That coordinate is high above the map. Without a radius, the closest road is still returned.
+
+With a strict radius:
+
+```bash
+gtav-coordinate-lookup --street-radius 30 --output road,intersection 0 0 1000
+```
+
+```json
+{
+  "road": null,
+  "intersection": null
+}
+```
+
+For a normal coordinate that is actually near a road, the same radius still returns a result:
+
+```bash
+gtav-coordinate-lookup --street-radius 30 --output road,intersection -1037.5 -2737.8 20.2
+```
+
+```json
+{
+  "road": "New Empire Way",
+  "intersection": null
+}
+```
+
 Recommended values:
 
 - `15` to `30` meters for strict road/street matching.
