@@ -67,7 +67,7 @@ cargo build --release
 Final binary:
 
 ```bash
-target/release/gtav-coordinate-lookup
+gtav-coordinate-lookup
 ```
 
 ## Basic Usage
@@ -75,7 +75,7 @@ target/release/gtav-coordinate-lookup
 Full JSON output, by default:
 
 ```bash
-target/release/gtav-coordinate-lookup -1037.5 -2737.8 20.2
+gtav-coordinate-lookup -1037.5 -2737.8 20.2
 ```
 
 ## Coordinate Input Formats
@@ -83,26 +83,20 @@ target/release/gtav-coordinate-lookup -1037.5 -2737.8 20.2
 All of these are accepted:
 
 ```bash
-target/release/gtav-coordinate-lookup -1037.5 -2737.8 20.2
-target/release/gtav-coordinate-lookup "-1037.5,-2737.8,20.2"
-target/release/gtav-coordinate-lookup -1037.5, -2737.8, 20.2
-target/release/gtav-coordinate-lookup "vec(-1037.5, -2737.8, 20.2)"
-target/release/gtav-coordinate-lookup "vec3(-1037.5, -2737.8, 20.2)"
-target/release/gtav-coordinate-lookup "vec4(-1037.5, -2737.8, 20.2, 0.0)"
-target/release/gtav-coordinate-lookup '{"x":-1037.5,"y":-2737.8,"z":20.2}'
-target/release/gtav-coordinate-lookup '{"X":-1037.5,"Y":-2737.8,"Z":20.2}'
-target/release/gtav-coordinate-lookup '[-1037.5,-2737.8,20.2]'
-target/release/gtav-coordinate-lookup '[-1037.5,-2737.8,20.2,0.0]'
-target/release/gtav-coordinate-lookup x=-1037.5 y=-2737.8 z=20.2
+gtav-coordinate-lookup -1037.5 -2737.8 20.2
+gtav-coordinate-lookup "-1037.5,-2737.8,20.2"
+gtav-coordinate-lookup -1037.5, -2737.8, 20.2
+gtav-coordinate-lookup "vec(-1037.5, -2737.8, 20.2)"
+gtav-coordinate-lookup "vec3(-1037.5, -2737.8, 20.2)"
+gtav-coordinate-lookup "vec4(-1037.5, -2737.8, 20.2, 0.0)"
+gtav-coordinate-lookup '{"x":-1037.5,"y":-2737.8,"z":20.2}'
+gtav-coordinate-lookup '{"X":-1037.5,"Y":-2737.8,"Z":20.2}'
+gtav-coordinate-lookup '[-1037.5,-2737.8,20.2]'
+gtav-coordinate-lookup '[-1037.5,-2737.8,20.2,0.0]'
+gtav-coordinate-lookup x=-1037.5 y=-2737.8 z=20.2
 ```
 
 For `vec4` and JSON arrays with 4 values, the fourth value is accepted and ignored.
-
-Using the release binary:
-
-```bash
-target/release/gtav-coordinate-lookup -1037.5 -2737.8 20.2
-```
 
 Expected output:
 
@@ -155,7 +149,7 @@ Shows CLI help.
 Zone code:
 
 ```bash
-target/release/gtav-coordinate-lookup --output zone-code -1037.5 -2737.8 20.2
+gtav-coordinate-lookup --output zone-code -1037.5 -2737.8 20.2
 ```
 
 ```text
@@ -165,7 +159,7 @@ AirP
 Zone name:
 
 ```bash
-target/release/gtav-coordinate-lookup --output zone-name -1037.5 -2737.8 20.2
+gtav-coordinate-lookup --output zone-name -1037.5 -2737.8 20.2
 ```
 
 ```text
@@ -175,7 +169,7 @@ Los Santos International Airport
 Road:
 
 ```bash
-target/release/gtav-coordinate-lookup --output road -1037.5 -2737.8 20.2
+gtav-coordinate-lookup --output road -1037.5 -2737.8 20.2
 ```
 
 ```text
@@ -185,7 +179,7 @@ New Empire Way
 Intersection:
 
 ```bash
-target/release/gtav-coordinate-lookup --output intersection 1850.0 3685.0 34.2
+gtav-coordinate-lookup --output intersection 1850.0 3685.0 34.2
 ```
 
 ```text
@@ -195,7 +189,7 @@ Zancudo Ave
 Multiple fields:
 
 ```bash
-target/release/gtav-coordinate-lookup --output zone-code,zone-name,road,intersection -1037.5 -2737.8 20.2
+gtav-coordinate-lookup --output zone-code,zone-name,road,intersection -1037.5 -2737.8 20.2
 ```
 
 ```json
@@ -216,7 +210,7 @@ Without a radius, the tool always returns the nearest road, even if the coordina
 With a radius:
 
 ```bash
-target/release/gtav-coordinate-lookup --street-radius 30 --output road -1037.5 -2737.8 20.2
+gtav-coordinate-lookup --street-radius 30 --output road -1037.5 -2737.8 20.2
 ```
 
 If no road exists within `30` meters, the result is empty/null.
@@ -226,37 +220,37 @@ It also affects `intersection`, because the intersection is calculated as anothe
 ## Good Test Coordinates
 
 ```bash
-target/release/gtav-coordinate-lookup --output zone-code,zone-name,road,intersection 215.0 -810.0 30.7
+gtav-coordinate-lookup --output zone-code,zone-name,road,intersection 215.0 -810.0 30.7
 ```
 
 Pillbox Hill, San Andreas Ave.
 
 ```bash
-target/release/gtav-coordinate-lookup --output zone-code,zone-name,road,intersection 1850.0 3685.0 34.2
+gtav-coordinate-lookup --output zone-code,zone-name,road,intersection 1850.0 3685.0 34.2
 ```
 
 Sandy Shores, Alhambra Dr / Zancudo Ave.
 
 ```bash
-target/release/gtav-coordinate-lookup --output zone-code,zone-name,road,intersection -134.0 6356.0 31.5
+gtav-coordinate-lookup --output zone-code,zone-name,road,intersection -134.0 6356.0 31.5
 ```
 
 Paleto Bay, Pyrite Ave / Paleto Blvd.
 
 ```bash
-target/release/gtav-coordinate-lookup --output zone-code,zone-name,road,intersection 1700.0 4800.0 41.0
+gtav-coordinate-lookup --output zone-code,zone-name,road,intersection 1700.0 4800.0 41.0
 ```
 
 Grapeseed, Grapeseed Main St / Grapeseed Ave.
 
 ```bash
-target/release/gtav-coordinate-lookup --output zone-code,zone-name,road,intersection 425.0 -979.0 30.7
+gtav-coordinate-lookup --output zone-code,zone-name,road,intersection 425.0 -979.0 30.7
 ```
 
 Mission Row, Atlee St / Sinner St.
 
 ```bash
-target/release/gtav-coordinate-lookup --output zone-code,zone-name,road,intersection -48.0 -1757.0 29.4
+gtav-coordinate-lookup --output zone-code,zone-name,road,intersection -48.0 -1757.0 29.4
 ```
 
 Davis, Davis Ave / Grove St.
