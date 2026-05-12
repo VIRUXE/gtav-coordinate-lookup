@@ -103,7 +103,6 @@ Expected output:
 
 ```json
 {
-  "coordinates": { "x": -1037.5, "y": -2737.8, "z": 20.2 },
   "zones": [
     { "name": "AirP", "displayName": "Los Santos International Airport", "match": "3d" }
   ],

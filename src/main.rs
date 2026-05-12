@@ -156,7 +156,6 @@ fn run() -> AppResult<()> {
     match config.output {
         OutputSelection::AllJson => {
             print_json(
-                config.point,
                 &zone_matches,
                 road_match.as_ref(),
                 intersection_match.as_ref(),
@@ -671,18 +670,11 @@ fn distance(a: Vec3, b: Vec3) -> f64 {
 }
 
 fn print_json(
-    point: Vec3,
     zone_matches: &[ZoneMatch<'_>],
     road_match: Option<&RoadMatch<'_>>,
     intersection_match: Option<&RoadMatch<'_>>,
 ) {
     println!("{{");
-    println!(
-        "  \"coordinates\": {{ \"x\": {}, \"y\": {}, \"z\": {} }},",
-        json_number(point.x),
-        json_number(point.y),
-        json_number(point.z)
-    );
     println!("  \"zones\": [");
     for (index, zone_match) in zone_matches.iter().enumerate() {
         let comma = if index + 1 == zone_matches.len() {
