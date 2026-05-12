@@ -2,6 +2,7 @@
 name = "gtav-coordinate-lookup"
 version = "1.0.0"
 edition = "2021"
+license = "Unlicense"
 
 [profile.release]
 strip = true
