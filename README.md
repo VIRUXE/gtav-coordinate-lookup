@@ -37,7 +37,7 @@ That makes it useful when you need readable GTA V locations without opening the 
 
 ## Embedded Data
 
-The GTAV data is embedded into the binary at build time:
+The GTAV data is converted into Rust lookup tables and embedded into the binary at build time:
 
 - `data/zones.json`
 - `data/nodes.zip`
@@ -47,6 +47,7 @@ This means:
 - No data files need to be passed at runtime.
 - The `data` folder does not need to sit next to the release binary.
 - The files only need to exist when building.
+- The release binary does not unzip or parse the raw data on startup.
 
 The embedded dumps come from `DurtyFree/gta-v-data-dumps`.
 
@@ -321,6 +322,7 @@ Davis, Davis Ave / Grove St.
 - If no zone matches by `z`, the tool falls back to `x/y`.
 - The road is calculated from the nearest road segment.
 - The intersection is calculated as another nearby road different from the primary road.
+- When `--output` asks for only some fields, unrelated lookups are skipped.
 
 ## Limitations
 
