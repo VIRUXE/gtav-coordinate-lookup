@@ -929,6 +929,15 @@ mod tests {
     }
 
     #[test]
+    fn parses_vec_coordinates_with_w_and_ignores_w() {
+        let point = parse_coordinates(&["vec(-1037.5, -2737.8, 20.2, 999.0)".to_string()]).unwrap();
+
+        assert_eq!(point.x, -1037.5);
+        assert_eq!(point.y, -2737.8);
+        assert_eq!(point.z, 20.2);
+    }
+
+    #[test]
     fn parses_key_value_coordinates() {
         let point = parse_coordinates(&[
             "x=-1037.5".to_string(),

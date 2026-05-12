@@ -87,6 +87,7 @@ gtav-coordinate-lookup -1037.5 -2737.8 20.2
 gtav-coordinate-lookup "-1037.5,-2737.8,20.2"
 gtav-coordinate-lookup -1037.5, -2737.8, 20.2
 gtav-coordinate-lookup "vec(-1037.5, -2737.8, 20.2)"
+gtav-coordinate-lookup "vec(-1037.5, -2737.8, 20.2, 0.0)"
 gtav-coordinate-lookup "vec3(-1037.5, -2737.8, 20.2)"
 gtav-coordinate-lookup "vec4(-1037.5, -2737.8, 20.2, 0.0)"
 gtav-coordinate-lookup '{"x":-1037.5,"y":-2737.8,"z":20.2}'
@@ -96,7 +97,7 @@ gtav-coordinate-lookup '[-1037.5,-2737.8,20.2,0.0]'
 gtav-coordinate-lookup x=-1037.5 y=-2737.8 z=20.2
 ```
 
-For `vec4` and JSON arrays with 4 values, the fourth value is accepted and ignored.
+For `vec`, `vec4`, and JSON arrays with 4 values, the fourth value is accepted and ignored.
 
 Expected output:
 
@@ -203,19 +204,38 @@ gtav-coordinate-lookup --output zone-code,zone-name,road,intersection -1037.5 -2
 
 ## Street Radius
 
-`--street-radius` helps avoid misleading results.
+`--street-radius` is a maximum distance filter for road lookup.
 
-Without a radius, the tool always returns the nearest road, even if the coordinate is far away from any real road.
+The road data is a network of road segments. By default, the tool finds the closest named road segment to the coordinate and returns it. That is useful for normal map points, but it can be misleading for coordinates that are not actually on or near a road.
 
-With a radius:
+For example, if a coordinate is:
+
+- In the ocean.
+- Inside an interior.
+- On a mountain trail.
+- High above the map.
+- In an empty field.
+- Far away from any road node.
+
+The closest road might still be hundreds of meters away. Without a radius, the tool will still return that road because it is technically the nearest known road.
+
+With `--street-radius`, road and intersection results are only returned when they are close enough:
 
 ```bash
 gtav-coordinate-lookup --street-radius 30 --output road -1037.5 -2737.8 20.2
 ```
 
-If no road exists within `30` meters, the result is empty/null.
+In this example, the road is only returned if it is within `30` meters of the coordinate. If no road is within that distance, the result is empty/null.
 
-It also affects `intersection`, because the intersection is calculated as another nearby road around the same coordinate.
+This is useful when you want confidence that the returned road really belongs to the coordinate.
+
+Recommended values:
+
+- `15` to `30` meters for strict road/street matching.
+- `50` to `100` meters for looser admin/debug lookups.
+- No radius when you always want the nearest road, no matter how far away.
+
+It also affects `intersection`. Intersections are found by looking for another nearby road around the same coordinate, so the same radius is used to avoid false crossing-road results.
 
 ## Good Test Coordinates
 
