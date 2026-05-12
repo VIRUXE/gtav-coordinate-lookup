@@ -1,22 +1,18 @@
 use serde::Deserialize;
 use std::cmp::Ordering;
 use std::env;
-use std::io::{Cursor, Read};
 use std::process;
-use zip::ZipArchive;
-
-const ZONES_JSON: &str = include_str!("../data/zones.json");
-const NODES_ZIP: &[u8] = include_bytes!("../data/nodes.zip");
 
 type AppResult<T> = Result<T, String>;
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+mod generated_data {
+    include!(concat!(env!("OUT_DIR"), "/generated_data.rs"));
+}
+
+#[derive(Clone, Copy, Debug)]
 struct Vec3 {
-    #[serde(rename = "X")]
     x: f64,
-    #[serde(rename = "Y")]
     y: f64,
-    #[serde(rename = "Z")]
     z: f64,
 }
 
@@ -37,48 +33,17 @@ struct JsonCoordinateObject {
     z: f64,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug)]
 struct Bounds {
-    #[serde(rename = "Minimum")]
     min: Vec3,
-    #[serde(rename = "Maximum")]
     max: Vec3,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug)]
 struct Zone {
-    #[serde(rename = "Name")]
-    name: String,
-    #[serde(rename = "DisplayName")]
-    display_name: Option<String>,
-    #[serde(rename = "Bounds")]
-    bounds: Vec<Bounds>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct NodeCell {
-    #[serde(rename = "AreaId")]
-    area_id: u16,
-    #[serde(rename = "Nodes")]
-    nodes: Vec<Node>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct Node {
-    #[serde(rename = "Id")]
-    id: u16,
-    #[serde(rename = "StreetName")]
-    street_name: String,
-    #[serde(rename = "Position")]
-    position: Vec3,
-    #[serde(rename = "ConnectedNodes")]
-    connected_nodes: Option<Vec<ConnectedNode>>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct ConnectedNode {
-    #[serde(rename = "Node")]
-    node: Node,
+    name: &'static str,
+    display_name: Option<&'static str>,
+    bounds: &'static [Bounds],
 }
 
 #[derive(Clone, Debug)]
@@ -117,7 +82,7 @@ enum MatchType {
 
 #[derive(Clone, Debug)]
 struct RoadSegment {
-    street_name: String,
+    street_name: &'static str,
     start_area_id: u16,
     start_node_id: u16,
     end_node_id: u16,
@@ -144,10 +109,10 @@ fn run() -> AppResult<()> {
     let zones = load_zones()?;
     let road_segments = load_road_segments()?;
 
-    let zone_matches = find_zones(&zones, config.point);
-    let road_match = find_nearest_road(&road_segments, config.point, config.street_radius);
+    let zone_matches = find_zones(zones, config.point);
+    let road_match = find_nearest_road(road_segments, config.point, config.street_radius);
     let intersection_match = find_intersection_road(
-        &road_segments,
+        road_segments,
         road_match.as_ref(),
         config.point,
         config.street_radius,
@@ -463,71 +428,16 @@ fn print_help() {
     );
 }
 
-fn load_zones() -> AppResult<Vec<Zone>> {
-    serde_json::from_str(ZONES_JSON)
-        .map_err(|error| format!("failed to parse embedded zones: {error}"))
+fn load_zones() -> AppResult<&'static [Zone]> {
+    Ok(generated_data::ZONES)
 }
 
-fn load_road_segments() -> AppResult<Vec<RoadSegment>> {
-    let cursor = Cursor::new(NODES_ZIP);
-    let mut archive = ZipArchive::new(cursor)
-        .map_err(|error| format!("failed to open embedded nodes: {error}"))?;
-    let mut nodes_json = String::new();
-
-    archive
-        .by_name("nodes.json")
-        .map_err(|error| format!("failed to read embedded nodes.json: {error}"))?
-        .read_to_string(&mut nodes_json)
-        .map_err(|error| format!("failed to decode embedded nodes.json: {error}"))?;
-
-    let cells: Vec<NodeCell> = serde_json::from_str(&nodes_json)
-        .map_err(|error| format!("failed to parse embedded road nodes: {error}"))?;
-
-    let mut segments = Vec::new();
-    for cell in cells {
-        for node in cell.nodes {
-            let Some(connected_nodes) = node.connected_nodes.as_ref() else {
-                continue;
-            };
-
-            for connected in connected_nodes {
-                let street_name = pick_street_name(&node.street_name, &connected.node.street_name);
-                if street_name.is_empty() {
-                    continue;
-                }
-
-                segments.push(RoadSegment {
-                    street_name: street_name.to_string(),
-                    start_area_id: cell.area_id,
-                    start_node_id: node.id,
-                    end_node_id: connected.node.id,
-                    start: node.position,
-                    end: connected.node.position,
-                });
-            }
-        }
-    }
-
-    if segments.is_empty() {
+fn load_road_segments() -> AppResult<&'static [RoadSegment]> {
+    if generated_data::ROAD_SEGMENTS.is_empty() {
         return Err("embedded road node data did not contain any named road segments".to_string());
     }
 
-    Ok(segments)
-}
-
-fn pick_street_name<'a>(first: &'a str, second: &'a str) -> &'a str {
-    if is_real_street_name(first) {
-        first
-    } else if is_real_street_name(second) {
-        second
-    } else {
-        ""
-    }
-}
-
-fn is_real_street_name(name: &str) -> bool {
-    let trimmed = name.trim();
-    !trimmed.is_empty() && trimmed != "0"
+    Ok(generated_data::ROAD_SEGMENTS)
 }
 
 fn find_zones<'a>(zones: &'a [Zone], point: Vec3) -> Vec<ZoneMatch<'a>> {
@@ -688,8 +598,8 @@ fn print_json(
         };
         println!(
             "    {{ \"name\": \"{}\", \"displayName\": {}, \"match\": \"{}\" }}{}",
-            json_escape(&zone_match.zone.name),
-            json_string_or_null(zone_match.zone.display_name.as_deref()),
+            json_escape(zone_match.zone.name),
+            json_string_or_null(zone_match.zone.display_name),
             match_type,
             comma
         );
@@ -699,7 +609,7 @@ fn print_json(
     match road_match {
         Some(road) => println!(
             "  \"road\": {{ \"name\": \"{}\", \"distance\": {}, \"from\": \"{}:{}\", \"to\": \"{}\" }},",
-            json_escape(&road.segment.street_name),
+            json_escape(road.segment.street_name),
             json_number(road.distance),
             road.segment.start_area_id,
             road.segment.start_node_id,
@@ -711,7 +621,7 @@ fn print_json(
     match intersection_match {
         Some(road) => println!(
             "  \"intersection\": {{ \"name\": \"{}\", \"distance\": {}, \"from\": \"{}:{}\", \"to\": \"{}\" }}",
-            json_escape(&road.segment.street_name),
+            json_escape(road.segment.street_name),
             json_number(road.distance),
             road.segment.start_area_id,
             road.segment.start_node_id,
@@ -759,16 +669,13 @@ fn selected_field_value(
     intersection_match: Option<&RoadMatch<'_>>,
 ) -> Option<String> {
     match field {
-        OutputField::ZoneCode => zone_matches.first().map(|zone| zone.zone.name.clone()),
-        OutputField::ZoneName => zone_matches.first().map(|zone| {
-            zone.zone
-                .display_name
-                .clone()
-                .unwrap_or_else(|| zone.zone.name.clone())
-        }),
-        OutputField::Road => road_match.map(|road| road.segment.street_name.clone()),
+        OutputField::ZoneCode => zone_matches.first().map(|zone| zone.zone.name.to_string()),
+        OutputField::ZoneName => zone_matches
+            .first()
+            .map(|zone| zone.zone.display_name.unwrap_or(zone.zone.name).to_string()),
+        OutputField::Road => road_match.map(|road| road.segment.street_name.to_string()),
         OutputField::Intersection => {
-            intersection_match.map(|road| road.segment.street_name.clone())
+            intersection_match.map(|road| road.segment.street_name.to_string())
         }
     }
 }
@@ -836,7 +743,7 @@ mod tests {
     fn finds_airport_zone_from_embedded_data() {
         let zones = load_zones().unwrap();
         let matches = find_zones(
-            &zones,
+            zones,
             Vec3 {
                 x: -1037.5,
                 y: -2737.8,
